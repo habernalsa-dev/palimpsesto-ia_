@@ -73,6 +73,7 @@ canvas { display:block; width:100%; height:100%; }
   display:flex; flex-direction:column;
   align-items:center; justify-content:center;
   z-index:100; gap:3rem;
+  pointer-events: none;
 }
 
 .inicio-panel {
@@ -81,6 +82,7 @@ canvas { display:block; width:100%; height:100%; }
   background: rgba(0,0,0,0.62);
   padding: 3rem 4rem;
   border: 1px solid rgba(255,255,255,0.15);
+  pointer-events: auto;
 }
 
 .menu-botones {
@@ -309,15 +311,15 @@ canvas { display:block; width:100%; height:100%; }
     <div class="menu-botones">
       <div class="btn-rombo" onclick="iniciarExperiencia()" title="Iniciar">
         <div class="rombo-bg"></div>
-        <div class="btn-icon">▶</div>
+        <div class="btn-icon">◈</div>
       </div>
       <div class="btn-rombo" onclick="abrirModal('instrucciones')" title="Instrucciones">
         <div class="rombo-bg"></div>
-        <div class="btn-icon">?</div>
+        <div class="btn-icon">◉</div>
       </div>
       <div class="btn-rombo" onclick="abrirModal('creditos')" title="Créditos">
         <div class="rombo-bg"></div>
-        <div class="btn-icon">©</div>
+        <div class="btn-icon">◎</div>
       </div>
     </div>
   </div>
