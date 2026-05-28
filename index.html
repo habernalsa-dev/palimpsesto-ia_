@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PalimpsestoIA</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; color:#fff; overflow:hidden; width:100vw; height:100vh; font-family: 'Courier New', monospace; }
+#viewer { position:fixed; inset:0; }
+canvas { display:block; width:100%; height:100%; }
+
+/* ── LOADING ── */
+#loading {
+  position:fixed; inset:0; background:#000;
+  display:flex; align-items:center; justify-content:center;
+  z-index:1000; font-size:0.7rem; letter-spacing:0.2em;
+  color:rgba(255,255,255,0.4); text-transform:uppercase;
+  transition:opacity 0.8s;
+}
+
+/* ── TITULO GLITCH ── */
+#titulo-glitch {
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-family: 'UnifrakturMaguntia', cursive;
+  color: #fff;
+  position: relative;
+  user-select: none;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+#titulo-glitch::before,
+#titulo-glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0; left: 0; width: 100%;
+  font-family: inherit;
+}
+#titulo-glitch::before {
+  color: #0ff;
+  animation: glitch1 2.5s infinite;
+  clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%);
+}
+#titulo-glitch::after {
+  color: #f0f;
+  animation: glitch2 2.5s infinite;
+  clip-path: polygon(0 60%, 100% 60%, 100% 80%, 0 80%);
+}
+@keyframes glitch1 {
+  0%,85%  { transform:translate(0); opacity:0; font-family:'UnifrakturMaguntia',cursive; }
+  86%     { transform:translate(-5px,1px); font-family:'Arial',sans-serif; opacity:1; }
+  88%     { transform:translate(5px,-2px); font-family:'Courier New',monospace; opacity:1; }
+  90%     { transform:translate(-3px,2px); font-family:'Impact',sans-serif; opacity:1; }
+  92%     { transform:translate(4px,-1px); font-family:monospace; opacity:0.8; }
+  94%     { transform:translate(-2px,3px); opacity:1; }
+  96%     { transform:translate(3px,-2px); opacity:0.6; }
+  98%     { transform:translate(-1px,1px); opacity:1; }
+  100%    { transform:translate(0); opacity:0; }
+}
+@keyframes glitch2 {
+  0%,87%  { transform:translate(0); opacity:0; font-family:'UnifrakturMaguntia',cursive; }
+  88%     { transform:translate(4px,2px); font-family:'Times New Roman',serif; opacity:1; }
+  90%     { transform:translate(-4px,-1px); font-family:'Helvetica',sans-serif; opacity:1; }
+  92%     { transform:translate(3px,1px); font-family:'Verdana',sans-serif; opacity:0.7; }
+  94%     { transform:translate(-2px,2px); opacity:1; }
+  96%     { transform:translate(2px,-3px); opacity:0.5; }
+  100%    { transform:translate(0); opacity:0; }
+}
+
+/* ── OVERLAY INICIO ── */
+#overlay-inicio {
+  position:fixed; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  z-index:100; gap:3rem;
+}
+
+.inicio-panel {
+  display:flex; flex-direction:column;
+  align-items:center; gap:3rem;
+  background: rgba(0,0,0,0.62);
+  padding: 3rem 4rem;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.menu-botones {
+  display:flex; gap:2rem; flex-wrap:wrap; justify-content:center;
+}
+
+.btn-rombo {
+  position:relative; width:120px; height:120px;
+  cursor:pointer; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  transition:transform 0.2s;
+}
+.btn-rombo:hover { transform:scale(1.1); }
+.btn-rombo .rombo-bg {
+  position:absolute; inset:0;
+  background: rgba(255,255,255,0.07);
+  border: 1.5px solid rgba(255,255,255,0.7);
+  transform:rotate(45deg);
+  transition: background 0.2s, border-color 0.2s;
+  backdrop-filter: blur(2px);
+}
+.btn-rombo:hover .rombo-bg {
+  background: rgba(255,255,255,0.18);
+  border-color: #fff;
+  box-shadow: 0 0 20px rgba(255,255,255,0.3);
+}
+.btn-rombo .btn-icon {
+  position:relative; font-size:2rem; z-index:1; line-height:1;
+  color: #fff;
+}
+
+/* ── NAV INFERIOR ── */
+#nav-bar {
+  position:fixed; bottom:1.5rem; left:50%;
+  transform:translateX(-50%);
+  display:none; gap:0.7rem;
+  z-index:50; align-items:center;
+  background: rgba(0,0,0,0.7);
+  padding: 0.8rem 1.2rem;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.nav-btn {
+  position:relative; width:56px; height:56px;
+  cursor:pointer; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  transition:transform 0.2s, opacity 0.2s;
+}
+.nav-btn.locked { opacity:0.2; cursor:not-allowed; pointer-events:none; }
+.nav-btn.hidden-nav { display:none; }
+.nav-btn:not(.locked):hover { transform:scale(1.12); }
+
+.nav-btn .rombo-bg {
+  position:absolute; inset:0;
+  background: rgba(0,0,0,0.8);
+  border: 1.5px solid rgba(255,255,255,0.5);
+  transform:rotate(45deg);
+  transition: background 0.2s, border-color 0.2s;
+  box-shadow: 0 0 10px rgba(0,0,0,0.8);
+}
+.nav-btn.active .rombo-bg {
+  background: rgba(255,255,255,0.2);
+  border-color: #fff;
+  box-shadow: 0 0 16px rgba(255,255,255,0.4);
+}
+.nav-btn.completed .rombo-bg { border-color: rgba(255,255,255,0.8); }
+.nav-btn .nav-icon {
+  position:relative; font-size:1rem; z-index:1;
+  color:#fff; text-shadow: 0 0 6px rgba(255,255,255,0.6);
+}
+
+/* ── PANEL LATERAL ── */
+#panel-texto {
+  position:fixed; right:0; top:0; bottom:0; width:300px;
+  display:none; flex-direction:column;
+  justify-content:center; padding:2rem 1.5rem;
+  z-index:40; pointer-events:none;
+}
+
+.frame-novela {
+  border: 1.5px solid rgba(255,255,255,0.7);
+  padding:1.4rem 1.6rem;
+  background: rgba(0,0,0,0.88);
+  position:relative; opacity:0;
+  transform:translateY(16px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+  pointer-events:auto;
+  box-shadow: 0 0 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.5);
+}
+.frame-novela.visible { opacity:1; transform:translateY(0); }
+.frame-novela::before {
+  content:''; position:absolute; top:-5px; left:-5px;
+  width:14px; height:14px;
+  border-top:2px solid #fff; border-left:2px solid #fff;
+}
+.frame-novela::after {
+  content:''; position:absolute; bottom:-5px; right:-5px;
+  width:14px; height:14px;
+  border-bottom:2px solid #fff; border-right:2px solid #fff;
+}
+.frame-titulo {
+  font-size:0.55rem; letter-spacing:0.25em;
+  text-transform:uppercase; color:rgba(255,255,255,0.45);
+  margin-bottom:0.9rem; font-family:'Courier New',monospace;
+}
+.frame-texto {
+  font-size:0.9rem; line-height:1.8;
+  color:rgba(255,255,255,0.95);
+  font-family:'Courier New',monospace;
+}
+
+/* ── BTN COMPLETAR ── */
+#btn-completar {
+  position:fixed; bottom:1.5rem; right:1.5rem;
+  z-index:60; display:none;
+  cursor:pointer; align-items:center; justify-content:center;
+}
+#btn-completar .rombo-wrap {
+  position:relative; width:72px; height:72px;
+  display:flex; align-items:center; justify-content:center;
+}
+#btn-completar .rombo-bg {
+  position:absolute; inset:0;
+  background: rgba(0,0,0,0.85);
+  border: 2px solid rgba(255,255,255,0.9);
+  transform:rotate(45deg);
+  box-shadow: 0 0 20px rgba(255,255,255,0.3);
+  transition: background 0.2s;
+}
+#btn-completar:hover .rombo-bg {
+  background: rgba(255,255,255,0.2);
+  box-shadow: 0 0 30px rgba(255,255,255,0.5);
+}
+#btn-completar .rombo-icon {
+  position:relative; font-size:1.3rem; z-index:1;
+  color:#fff; text-shadow: 0 0 8px rgba(255,255,255,0.8);
+}
+
+/* ── MODAL ── */
+#modal {
+  position:fixed; inset:0; background:rgba(0,0,0,0.9);
+  z-index:200; display:none;
+  align-items:center; justify-content:center;
+}
+.modal-caja {
+  border:1.5px solid rgba(255,255,255,0.5);
+  padding:2.5rem; max-width:480px; width:90%;
+  position:relative; background:rgba(0,0,0,0.95);
+  box-shadow: 0 0 40px rgba(0,0,0,1);
+}
+.modal-caja::before {
+  content:''; position:absolute; top:-6px; left:-6px;
+  width:18px; height:18px;
+  border-top:2px solid #fff; border-left:2px solid #fff;
+}
+.modal-caja::after {
+  content:''; position:absolute; bottom:-6px; right:-6px;
+  width:18px; height:18px;
+  border-bottom:2px solid #fff; border-right:2px solid #fff;
+}
+.modal-titulo {
+  font-size:0.6rem; letter-spacing:0.25em;
+  text-transform:uppercase; color:rgba(255,255,255,0.4);
+  margin-bottom:1.4rem;
+}
+.modal-contenido {
+  font-family:'Courier New',monospace;
+  font-size:0.88rem; line-height:1.85;
+  color:rgba(255,255,255,0.85);
+}
+.modal-contenido p { margin-bottom:0.7rem; }
+.modal-close {
+  position:absolute; top:1rem; right:1rem;
+  cursor:pointer; background:none; border:none;
+  color:rgba(255,255,255,0.5); font-family:'Courier New',monospace;
+  font-size:0.65rem; letter-spacing:0.1em;
+}
+.modal-close:hover { color:#fff; }
+
+/* ── HINT ── */
+#hint {
+  position:fixed; bottom:5.5rem; left:50%;
+  transform:translateX(-50%);
+  font-size:0.55rem; letter-spacing:0.15em;
+  color:rgba(255,255,255,0.3); text-transform:uppercase;
+  z-index:30; pointer-events:none; transition:opacity 1.5s;
+  white-space:nowrap;
+  background: rgba(0,0,0,0.5);
+  padding: 0.3rem 0.8rem;
+}
+
+/* ── DESBLOQUEO NOTIF ── */
+#notif {
+  position:fixed; top:1.5rem; left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,0.85);
+  border:1px solid rgba(255,255,255,0.4);
+  padding:0.6rem 1.2rem;
+  font-size:0.6rem; letter-spacing:0.15em;
+  text-transform:uppercase; color:rgba(255,255,255,0.8);
+  z-index:80; display:none;
+  box-shadow: 0 0 20px rgba(255,255,255,0.1);
+}
+
+@keyframes pulso {
+  0%,100% { transform:scale(1); box-shadow: 0 0 10px rgba(255,255,255,0.2); }
+  50% { transform:scale(1.2); box-shadow: 0 0 30px rgba(255,255,255,0.6); }
+}
+@keyframes fadeInDown {
+  from { opacity:0; transform:translateX(-50%) translateY(-10px); }
+  to { opacity:1; transform:translateX(-50%) translateY(0); }
+}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="loading">Cargando experiencia...</div>
+<div id="viewer"><canvas id="canvas360"></canvas></div>
+
+<!-- INICIO -->
+<div id="overlay-inicio">
+  <div class="inicio-panel">
+    <div id="titulo-glitch" data-text="PalimpsestoIA">PalimpsestoIA</div>
+    <div class="menu-botones">
+      <div class="btn-rombo" onclick="iniciarExperiencia()" title="Iniciar">
+        <div class="rombo-bg"></div>
+        <div class="btn-icon">▶</div>
+      </div>
+      <div class="btn-rombo" onclick="abrirModal('instrucciones')" title="Instrucciones">
+        <div class="rombo-bg"></div>
+        <div class="btn-icon">?</div>
+      </div>
+      <div class="btn-rombo" onclick="abrirModal('creditos')" title="Créditos">
+        <div class="rombo-bg"></div>
+        <div class="btn-icon">©</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL TEXTO -->
+<div id="panel-texto">
+  <div class="frame-novela" id="frame-narrativo">
+    <div class="frame-titulo" id="frame-titulo-label"></div>
+    <div class="frame-texto" id="frame-texto-contenido"></div>
+  </div>
+</div>
+
+<!-- NAV -->
+<div id="nav-bar"></div>
+
+<!-- BTN COMPLETAR -->
+<div id="btn-completar" onclick="completarEscena()">
+  <div class="rombo-wrap">
+    <div class="rombo-bg"></div>
+    <div class="rombo-icon" id="btn-completar-icon">◈</div>
+  </div>
+</div>
+
+<!-- HINT -->
+<div id="hint">arrastra para explorar · rombos para navegar</div>
+
+<!-- NOTIF -->
+<div id="notif" id="notif"></div>
+
+<!-- MODAL -->
+<div id="modal" onclick="cerrarModal(event)">
+  <div class="modal-caja">
+    <button class="modal-close" onclick="cerrarModal()">[ cerrar ]</button>
+    <div class="modal-titulo" id="modal-titulo"></div>
+    <div class="modal-contenido" id="modal-contenido"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── ESCENAS ──
+const ESCENAS = {
+  PALIMPSESTO_IA: { id:'PALIMPSESTO_IA', img:'imgs/PALIMPSESTO_IA.png', texto:null, esInicio:true },
+  INTRODUCCION:   { id:'INTRODUCCION', img:'imgs/INTRODUCCION.png', titulo:'Introducción',
+    texto:'Ha pasado el tiempo. Hay muchas cosas que no recuerdo, pero tengo la certeza de que el pasado era diferente en muchos sentidos. Sin embargo, aún estoy aquí a pesar de todo, y espero encontrar a alguien más. Ya no soporto la idea de estar en este mundo sin un alma que me escuche y a quien hablar...\n\nRecuerdo bien el pasado; ahora puedo ver con claridad los hilos y los factores que me trajeron hasta este abismo.',
+    siguientes:['AMBIENTE','VIGILANCIA','SIMBOLOS','TESCREAL'], nivel:1 },
+  AMBIENTE:   { id:'AMBIENTE', img:'imgs/AMBIENTE.png', titulo:'Ambiente',
+    texto:'Usaron el agua para saciar a una máquina sedienta; excavaron la tierra para darle cuerpo. Siempre estaba recomponiéndose, reconstruyéndose sin pausa, a toda prisa. Pedía y pedía sin hablar, y consumía sin tener misericordia.',
+    nivel:2, grupo:'capa2' },
+  VIGILANCIA: { id:'VIGILANCIA', img:'imgs/VIGILANCIA.png', titulo:'Vigilancia',
+    texto:'Lo vigilaba todo. El sueño no existía para ella; sus ojos se posaban sobre cada rincón y cada rostro, a la vez. No dormía. Vivía en una vigilia perpetua, diseccionando a quién, el qué y el para qué. Se mantenía en constante alerta.',
+    nivel:2, grupo:'capa2' },
+  SIMBOLOS:   { id:'SIMBOLOS', img:'imgs/SIMBOLOS.png', titulo:'Símbolos',
+    texto:'Homogeneizó y estandarizó toda forma de pensar. Eliminó cualquier diversidad; las representaciones de otras maneras de ver el mundo quedaron erradicadas.',
+    nivel:2, grupo:'capa2' },
+  TESCREAL:   { id:'TESCREAL', img:'imgs/TESCREAL.png', titulo:'TESCREAL',
+    texto:'Siempre con una visión salvadora, se propuso expandir su pensamiento por el cosmos. El cuerpo ya no sería necesario para replicar su obra en mundos lejanos y perpetuar así su intelecto superior.',
+    nivel:2, grupo:'capa2' },
+  SF_CONVIVENCIALIDAD: { id:'SF_CONVIVENCIALIDAD', img:'imgs/SF_CONVIVENCIALIDAD.png', titulo:'SF y Convivencialidad',
+    texto:'No sé si son recuerdos, alucinaciones, premoniciones o fantasías; pero es posible que sean todas o ninguna. Creo que en este lugar cabe la posibilidad de que todo sea, es o haya sido diferente.',
+    requiere:['AMBIENTE','VIGILANCIA','SIMBOLOS','TESCREAL'],
+    siguientes:['HIBRIDACION','ONTOLOGIAS','ATEMPORALIDADES'], nivel:3 },
+  HIBRIDACION: { id:'HIBRIDACION', img:'imgs/HIBRIDACION.png', titulo:'Hibridación',
+    texto:'La tecnología sirviendo al hombre como una vía para convivir. A través de ella, como un cíborg que habita y coexiste de manera igualitaria con su entorno, entiende el momento presente para mejorar en comunidad. Lo biológico, lo maquinal, lo humano y lo no humano relacionándose en armonía.',
+    nivel:4, grupo:'capa4' },
+  ONTOLOGIAS:  { id:'ONTOLOGIAS', img:'imgs/ONTOLOGIAS.png', titulo:'Ontologías',
+    texto:'Una simbiosis que abraza la diversidad y lo ajeno, pero lejos de la complacencia. Un pacto que respeta otros horizontes y formas distintas de habitar los mundos.',
+    nivel:4, grupo:'capa4' },
+  ATEMPORALIDADES: { id:'ATEMPORALIDADES', img:'imgs/ATEMPORALIDADES.png', titulo:'Atemporalidades y Retemporalidades',
+    texto:'Abriendo los ojos a un tiempo que ya no es vector, sino ciclo y laberinto. Un universo de espacialidades infinitas, dictado por cosmogonías que la razón jamás llegó a comprender.',
+    nivel:4, grupo:'capa4' },
+  HONGO: { id:'HONGO', img:'imgs/HONGO.png', titulo:'— —',
+    texto:'...de modo que la vida es esta interrelacionada y cambia en todo momento.\n\nEl micelio no distingue entre pasado y futuro: solo propaga. Solo conecta. Solo transforma lo que muere en aquello que aún no ha comenzado a vivir.\n\nQuizás nunca hubo un fin. Solo una red que respira.',
+    requiere:['HIBRIDACION','ONTOLOGIAS','ATEMPORALIDADES'], esFinal:true, nivel:5 },
+};
+
+const CAPA2 = ['AMBIENTE','VIGILANCIA','SIMBOLOS','TESCREAL'];
+const CAPA4 = ['HIBRIDACION','ONTOLOGIAS','ATEMPORALIDADES'];
+
+const NAV_ORDEN = [
+  { id:'INTRODUCCION', icon:'◉' },
+  { id:'AMBIENTE',     icon:'◎' },
+  { id:'VIGILANCIA',   icon:'◈' },
+  { id:'SIMBOLOS',     icon:'◇' },
+  { id:'TESCREAL',     icon:'◆' },
+  { id:'SF_CONVIVENCIALIDAD', icon:'⬟' },
+  { id:'HIBRIDACION',  icon:'◉', capaSF:true },
+  { id:'ONTOLOGIAS',   icon:'◎', capaSF:true },
+  { id:'ATEMPORALIDADES', icon:'◈', capaSF:true },
+  { id:'HONGO',        icon:'◆', capaSF:true },
+];
+
+const estado = {
+  escenaActual: 'PALIMPSESTO_IA',
+  completadas: new Set(),
+  enExperiencia: false,
+  textoMostrado: false,
+  sfDesbloqueada: false,
+  hongoDesbloqueado: false,
+};
+
+// ── GLITCH ERRATICO ──
+function iniciarGlitch() { /* CSS handles glitch animation */ }
+function detenerGlitch() { /* no-op */ }
+
+// ── THREE.JS ──
+let scene, camera, renderer, sphere, textureLoader;
+let isDragging = false, prevX = 0, prevY = 0;
+let lon = 0, lat = 0, targetLon = 0, targetLat = 0;
+let texturaCache = {};
+let typewriterTimer = null;
+let textoTimer = null;
+let btnTimer = null;
+
+function initThree() {
+  const canvas = document.getElementById('canvas360');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 0, 0.01);
+
+  const geo = new THREE.SphereGeometry(500, 64, 32);
+  sphere = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x111111, side: THREE.BackSide }));
+  scene.add(sphere);
+
+  textureLoader = new THREE.TextureLoader();
+
+  // Mouse
+  canvas.addEventListener('mousedown', e => { isDragging=true; prevX=e.clientX; prevY=e.clientY; });
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    targetLon -= (e.clientX-prevX)*0.15;
+    targetLat += (e.clientY-prevY)*0.1;
+    targetLat = Math.max(-85, Math.min(85, targetLat));
+    prevX=e.clientX; prevY=e.clientY;
+    onExplora();
+  });
+  window.addEventListener('mouseup', () => isDragging=false);
+
+  // Touch
+  let t0=null;
+  canvas.addEventListener('touchstart', e => { t0=e.touches[0]; isDragging=true; }, {passive:true});
+  canvas.addEventListener('touchmove', e => {
+    if (!isDragging||!t0) return;
+    targetLon -= (e.touches[0].clientX-t0.clientX)*0.15;
+    targetLat += (e.touches[0].clientY-t0.clientY)*0.1;
+    targetLat = Math.max(-85, Math.min(85, targetLat));
+    t0=e.touches[0];
+    onExplora();
+  }, {passive:true});
+  canvas.addEventListener('touchend', () => { isDragging=false; t0=null; });
+
+  window.addEventListener('resize', () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+  });
+
+  animate();
+}
+
+function onExplora() {
+  if (!estado.textoMostrado && estado.enExperiencia) mostrarTexto();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  lon += (targetLon - lon) * 0.07;
+  lat += (targetLat - lat) * 0.07;
+  const phi = THREE.MathUtils.degToRad(90-lat);
+  const theta = THREE.MathUtils.degToRad(lon);
+  camera.lookAt(
+    500*Math.sin(phi)*Math.cos(theta),
+    500*Math.cos(phi),
+    500*Math.sin(phi)*Math.sin(theta)
+  );
+  renderer.render(scene, camera);
+}
+
+function cargarTextura(imgPath, cb) {
+  if (texturaCache[imgPath]) { cb(texturaCache[imgPath]); return; }
+  const loader = new THREE.TextureLoader();
+  loader.load(imgPath, tex => {
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    texturaCache[imgPath] = tex;
+    cb(tex);
+  }, undefined, err => {
+    console.error('Error cargando textura:', imgPath, err);
+  });
+}
+
+function irAEscena(id) {
+  const esc = ESCENAS[id];
+  if (!esc) return;
+  if (esc.requiere && esc.requiere.some(r => !estado.completadas.has(r))) return;
+
+  estado.escenaActual = id;
+  estado.textoMostrado = false;
+
+  clearTimeout(textoTimer);
+  clearTimeout(btnTimer);
+  clearTimeout(typewriterTimer);
+
+  ocultarTexto();
+  ocultarBtnCompletar();
+
+  cargarTextura(esc.img, tex => {
+    sphere.material = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide });
+    sphere.material.needsUpdate = true;
+  });
+
+  actualizarNav();
+
+  if (esc.texto) {
+    document.getElementById('frame-titulo-label').textContent = esc.titulo || '';
+    document.getElementById('frame-texto-contenido').textContent = '';
+    document.getElementById('panel-texto').style.display = 'flex';
+    textoTimer = setTimeout(() => mostrarTexto(), 3500);
+  } else {
+    document.getElementById('panel-texto').style.display = 'none';
+  }
+
+  if (id !== 'PALIMPSESTO_IA') {
+    btnTimer = setTimeout(() => mostrarBtnCompletar(id), 10000);
+  }
+}
+
+function mostrarTexto() {
+  if (estado.textoMostrado) return;
+  estado.textoMostrado = true;
+  const esc = ESCENAS[estado.escenaActual];
+  if (!esc || !esc.texto) return;
+  const el = document.getElementById('frame-texto-contenido');
+  const frame = document.getElementById('frame-narrativo');
+  frame.classList.add('visible');
+  const texto = esc.texto;
+  let i = 0;
+  el.textContent = '';
+  function tick() {
+    if (i < texto.length) {
+      el.textContent += texto[i];
+      i++;
+      typewriterTimer = setTimeout(tick, texto[i-1]==='\n' ? 200 : 22);
+    }
+  }
+  tick();
+}
+
+function ocultarTexto() {
+  document.getElementById('frame-narrativo').classList.remove('visible');
+}
+
+function mostrarBtnCompletar(id) {
+  const esc = ESCENAS[id];
+  const icon = document.getElementById('btn-completar-icon');
+  icon.textContent = esc.esFinal ? '⟳' : '◈';
+  document.getElementById('btn-completar').style.display = 'flex';
+}
+
+function ocultarBtnCompletar() {
+  document.getElementById('btn-completar').style.display = 'none';
+}
+
+function completarEscena() {
+  const id = estado.escenaActual;
+  const esc = ESCENAS[id];
+  if (esc.esFinal) { volverInicio(); return; }
+
+  estado.completadas.add(id);
+  actualizarNav();
+  ocultarBtnCompletar();
+
+  // Desbloquear SF: las 4 de capa2 completas
+  if (!estado.sfDesbloqueada && CAPA2.every(x => estado.completadas.has(x))) {
+    estado.sfDesbloqueada = true;
+    setTimeout(() => {
+      mostrarNotif('◈ SF y Convivencialidad desbloqueada');
+      actualizarNav();
+    }, 300);
+  }
+
+  // Desbloquear HONGO: SF + las 3 de capa4 completas
+  const hongoReq = ['SF_CONVIVENCIALIDAD', 'HIBRIDACION', 'ONTOLOGIAS', 'ATEMPORALIDADES'];
+  if (!estado.hongoDesbloqueado && hongoReq.every(x => estado.completadas.has(x))) {
+    estado.hongoDesbloqueado = true;
+    setTimeout(() => {
+      mostrarNotif('◆ El Hongo ha emergido');
+      actualizarNav();
+    }, 300);
+  }
+}
+
+function mostrarNotif(txt) {
+  const el = document.getElementById('notif');
+  el.textContent = txt;
+  el.style.display = 'block';
+  el.style.animation = 'fadeInDown 0.4s ease';
+  setTimeout(() => { el.style.display='none'; }, 3500);
+}
+
+// ── NAV ──
+function construirNav() {
+  const nav = document.getElementById('nav-bar');
+  nav.innerHTML = '';
+  NAV_ORDEN.forEach(item => {
+    const btn = document.createElement('div');
+    btn.className = 'nav-btn';
+    btn.dataset.nav = item.id;
+    if (item.capaSF) btn.classList.add('hidden-nav');
+    btn.innerHTML = `<div class="rombo-bg"></div><div class="nav-icon">${item.icon}</div>`;
+    btn.addEventListener('click', () => {
+      if (!btn.classList.contains('locked') && !btn.classList.contains('hidden-nav')) {
+        irAEscena(item.id);
+      }
+    });
+    nav.appendChild(btn);
+  });
+  actualizarNav();
+}
+
+function actualizarNav() {
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    const id = btn.dataset.nav;
+    const esc = ESCENAS[id];
+    btn.classList.remove('active','locked','completed');
+
+    // Visibilidad capa SF (hibridacion, ontologias, atemporalidades, hongo)
+    const esDeCAPASF = NAV_ORDEN.find(x => x.id === id && x.capaSF);
+    if (esDeCAPASF) {
+      if (!estado.sfDesbloqueada) { btn.classList.add('hidden-nav'); return; }
+      else { btn.classList.remove('hidden-nav'); }
+    }
+
+    if (id === estado.escenaActual) btn.classList.add('active');
+    if (estado.completadas.has(id)) btn.classList.add('completed');
+
+    // Bloqueos individuales
+    if (id === 'SF_CONVIVENCIALIDAD' && !estado.sfDesbloqueada) {
+      btn.classList.add('locked');
+    } else if (id === 'HONGO' && !estado.hongoDesbloqueado) {
+      btn.classList.add('locked');
+    } else if (esc && esc.requiere) {
+      if (esc.requiere.some(r => !estado.completadas.has(r))) btn.classList.add('locked');
+    }
+  });
+}
+
+// ── FLUJO ──
+function iniciarExperiencia() {
+  detenerGlitch();
+  document.getElementById('overlay-inicio').style.display = 'none';
+  document.getElementById('nav-bar').style.display = 'flex';
+  estado.enExperiencia = true;
+  construirNav();
+  irAEscena('INTRODUCCION');
+  setTimeout(() => { document.getElementById('hint').style.opacity = '0'; }, 6000);
+}
+
+function volverInicio() {
+  document.getElementById('overlay-inicio').style.display = 'flex';
+  document.getElementById('nav-bar').style.display = 'none';
+  document.getElementById('panel-texto').style.display = 'none';
+  ocultarBtnCompletar();
+  estado.enExperiencia = false;
+  estado.sfDesbloqueada = false;
+  estado.hongoDesbloqueado = false;
+  estado.completadas = new Set();
+  cargarTextura('imgs/PALIMPSESTO_IA.png', tex => {
+    sphere.material = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide });
+    sphere.material.needsUpdate = true;
+  });
+  iniciarGlitch();
+}
+
+// ── MODALES ──
+const MODALES = {
+  instrucciones: {
+    titulo:'// Instrucciones de navegación',
+    html:`<p>Explora cada escena 360° arrastrando el cursor o deslizando en pantalla táctil.</p>
+<p>El texto narrativo aparece progresivamente en el panel derecho mientras exploras la escena.</p>
+<p>Usa los <strong>rombos</strong> en la barra inferior para moverte entre escenas.</p>
+<p>Algunas escenas están bloqueadas — debes completar las anteriores para acceder a ellas.</p>
+<p>Marca cada escena usando el rombo en la esquina inferior derecha. El camino se completa cuando llegas al <strong>Hongo</strong>.</p>`
+  },
+  creditos: {
+    titulo:'// Créditos',
+    html:`<p>Héctor Adolfo Bernal Sandoval</p><br>
+<p>Seminario de Área</p>
+<p>Doctorado en Comunicación, Lenguajes e Información</p>
+<p>Pontificia Universidad Javeriana</p>
+<p>2026</p>`
+  }
+};
+
+function abrirModal(tipo) {
+  const d = MODALES[tipo];
+  document.getElementById('modal-titulo').textContent = d.titulo;
+  document.getElementById('modal-contenido').innerHTML = d.html;
+  document.getElementById('modal').style.display = 'flex';
+}
+function cerrarModal(e) {
+  if (!e || e.target===document.getElementById('modal') || e.currentTarget.classList.contains('modal-close')) {
+    document.getElementById('modal').style.display = 'none';
+  }
+}
+
+function ocultarLoading() {
+  const el = document.getElementById('loading');
+  el.style.opacity = '0';
+  setTimeout(() => el.style.display='none', 800);
+}
+
+// ── INIT ──
+window.addEventListener('load', () => {
+  initThree();
+  cargarTextura('imgs/PALIMPSESTO_IA.png', tex => {
+    sphere.material = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide });
+    sphere.material.needsUpdate = true;
+    ocultarLoading();
+    iniciarGlitch();
+  });
+});
+</script>
+</body>
+</html>
